@@ -6,11 +6,7 @@
   <title>Music Mini App</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: var(--tg-theme-bg-color, #0f0f0f);
@@ -36,9 +32,7 @@
       background: var(--tg-theme-secondary-bg-color, #1c1c1e);
       cursor: pointer;
     }
-    .track:active {
-      opacity: 0.7;
-    }
+    .track:active { opacity: 0.7; }
     .track img {
       width: 48px;
       height: 48px;
@@ -46,17 +40,9 @@
       margin-right: 12px;
       object-fit: cover;
     }
-    .track-info {
-      flex: 1;
-    }
-    .track-title {
-      font-weight: 500;
-    }
-    .track-artist {
-      font-size: 13px;
-      opacity: 0.7;
-      margin-top: 2px;
-    }
+    .track-info { flex: 1; }
+    .track-title { font-weight: 500; }
+    .track-artist { font-size: 13px; opacity: 0.7; margin-top: 2px; }
     #player-container {
       margin-top: 16px;
       border-radius: 12px;
@@ -86,16 +72,43 @@
     tg.ready();
     tg.expand();
 
+    const API_KEY = "AIzaSyAjWf7fCaJrnv1bCh3UzSsK5ZStdz9RaTQ";
     const searchInput = document.getElementById('search');
     const resultsDiv = document.getElementById('results');
     const playerContainer = document.getElementById('player-container');
 
-    // Временные демо-данные (потом заменим на реальный поиск)
-    const demoTracks = [
-      { title: "Оставь их", artist: "Scriptonite", videoId: "dQw4w9WgXcQ" },
-      { title: "Космос", artist: "МакSим", videoId: "9bZkp7q19f0" },
-      { title: "Я свободен", artist: "КиШ", videoId: "kJQP7kiw5Fk" },
-    ];
+    let searchTimeout;
+
+    async function searchYouTube(query) {
+      if (!query.trim()) {
+        resultsDiv.innerHTML = '';
+        return;
+      }
+
+      resultsDiv.innerHTML = '<div class="placeholder">Ищу...</div>';
+
+      try {
+        const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=10&q=${encodeURIComponent(query)}&key=${API_KEY}`;
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (data.error) {
+          resultsDiv.innerHTML = `<div class="placeholder">Ошибка: ${data.error.message}</div>`;
+          return;
+        }
+
+        const tracks = data.items.map(item => ({
+          title: item.snippet.title,
+          artist: item.snippet.channelTitle,
+          videoId: item.id.videoId,
+          thumbnail: item.snippet.thumbnails.medium?.url || item.snippet.thumbnails.default.url
+        }));
+
+        renderResults(tracks);
+      } catch (e) {
+        resultsDiv.innerHTML = '<div class="placeholder">Ошибка сети</div>';
+      }
+    }
 
     function renderResults(tracks) {
       if (!tracks.length) {
@@ -104,7 +117,7 @@
       }
       resultsDiv.innerHTML = tracks.map(track => `
         <div class="track" onclick="playTrack('${track.videoId}')">
-          <img src="https://i.ytimg.com/vi/${track.videoId}/hqdefault.jpg" alt="">
+          <img src="${track.thumbnail}" alt="">
           <div class="track-info">
             <div class="track-title">${track.title}</div>
             <div class="track-artist">${track.artist}</div>
@@ -124,21 +137,15 @@
     }
 
     searchInput.addEventListener('input', (e) => {
-      const query = e.target.value.toLowerCase().trim();
+      clearTimeout(searchTimeout);
+      const query = e.target.value.trim();
       if (!query) {
         resultsDiv.innerHTML = '';
         playerContainer.innerHTML = '';
         return;
       }
-      const filtered = demoTracks.filter(t => 
-        t.title.toLowerCase().includes(query) || 
-        t.artist.toLowerCase().includes(query)
-      );
-      renderResults(filtered);
+      searchTimeout = setTimeout(() => searchYouTube(query), 500);
     });
-
-    // Показываем демо при загрузке
-    renderResults(demoTracks);
   </script>
 </body>
 </html>
