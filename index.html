@@ -33,13 +33,6 @@
       cursor: pointer;
     }
     .track:active { opacity: 0.7; }
-    .track img {
-      width: 48px;
-      height: 48px;
-      border-radius: 6px;
-      margin-right: 12px;
-      object-fit: cover;
-    }
     .track-info { flex: 1; }
     .track-title { font-weight: 500; }
     .track-artist { font-size: 13px; opacity: 0.7; margin-top: 2px; }
@@ -47,12 +40,7 @@
       margin-top: 16px;
       border-radius: 12px;
       overflow: hidden;
-      background: #000;
-    }
-    #player-container iframe {
-      width: 100%;
-      height: 215px;
-      border: none;
+      min-height: 166px;
     }
     .placeholder {
       text-align: center;
@@ -63,7 +51,7 @@
   </style>
 </head>
 <body>
-  <input id="search" type="text" placeholder="Поиск музыки..." />
+  <input id="search" type="text" placeholder="Поиск музыки (SoundCloud)..." />
   <div id="results"></div>
   <div id="player-container"></div>
 
@@ -72,76 +60,61 @@
     tg.ready();
     tg.expand();
 
-    const API_KEY = "AIzaSyAjWf7fCaJrnv1bCh3UzSsK5ZStdz9RaTQ";
     const searchInput = document.getElementById('search');
     const resultsDiv = document.getElementById('results');
     const playerContainer = document.getElementById('player-container');
 
     let searchTimeout;
 
-    async function searchYouTube(query) {
+    // Простой поиск через SoundCloud (используем публичный виджет)
+    async function searchSoundCloud(query) {
       if (!query.trim()) {
         resultsDiv.innerHTML = '';
+        playerContainer.innerHTML = '';
         return;
       }
 
       resultsDiv.innerHTML = '<div class="placeholder">Ищу...</div>';
 
-      try {
-        const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&videoSyndicated=true&maxResults=12&q=${encodeURIComponent(query + " audio")}&key=${API_KEY}`;
-        const res = await fetch(url);
-        const data = await res.json();
-
-        if (data.error) {
-          resultsDiv.innerHTML = `<div class="placeholder">Ошибка: ${data.error.message}</div>`;
-          return;
-        }
-
-        const tracks = (data.items || [])
-          .filter(item => item.id?.videoId)
-          .map(item => ({
-            title: item.snippet.title.replace(/&/g, '&').replace(/"/g, '"'),
-            artist: item.snippet.channelTitle,
-            videoId: item.id.videoId,
-            thumbnail: item.snippet.thumbnails?.medium?.url || item.snippet.thumbnails?.default?.url
-          }));
-
-        renderResults(tracks);
-      } catch (e) {
-        resultsDiv.innerHTML = '<div class="placeholder">Ошибка сети</div>';
-      }
-    }
-
-    function renderResults(tracks) {
-      if (!tracks.length) {
-        resultsDiv.innerHTML = '<div class="placeholder">Ничего не найдено</div>';
-        return;
-      }
-      resultsDiv.innerHTML = tracks.map(track => `
-        <div class="track" onclick="playTrack('${track.videoId}')">
-          <img src="${track.thumbnail}" alt="">
+      // Формируем прямую ссылку на поиск SoundCloud
+      const searchUrl = `https://soundcloud.com/search?q=${encodeURIComponent(query)}`;
+      
+      // Показываем кнопку перехода + пробуем встроить популярный трек по запросу
+      resultsDiv.innerHTML = `
+        <div class="track" onclick="openSearch('${query}')">
           <div class="track-info">
-            <div class="track-title">${track.title}</div>
-            <div class="track-artist">${track.artist}</div>
+            <div class="track-title">Искать «${query}» на SoundCloud</div>
+            <div class="track-artist">Нажми, чтобы открыть результаты</div>
           </div>
         </div>
-      `).join('');
+      `;
+
+      // Пробуем загрузить плеер с поисковым запросом
+      loadPlayer(query);
     }
 
-    function playTrack(videoId) {
-      // Открываем в новом окне, если эмбед не работает
-      const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&playsinline=1&rel=0`;
-      
+    function openSearch(query) {
+      const url = `https://soundcloud.com/search/sounds?q=${encodeURIComponent(query)}`;
+      tg.openLink(url);
+    }
+
+    function loadPlayer(query) {
+      // SoundCloud не даёт нормальный поиск через эмбед без API,
+      // поэтому показываем плеер с возможностью открыть полный поиск
       playerContainer.innerHTML = `
-        <iframe 
-          src="${embedUrl}"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowfullscreen>
-        </iframe>
-        <div style="text-align:center; margin-top:8px;">
-          <a href="https://www.youtube.com/watch?v=${videoId}" target="_blank" style="color:#aaa; font-size:13px;">
-            Открыть на YouTube
-          </a>
+        <div style="background:#1c1c1e; border-radius:12px; padding:16px; text-align:center;">
+          <div style="margin-bottom:12px; opacity:0.8;">Плеер SoundCloud</div>
+          <iframe 
+            width="100%" 
+            height="166" 
+            scrolling="no" 
+            frameborder="no" 
+            allow="autoplay"
+            src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/293&color=%23ff5500&auto_play=false&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false">
+          </iframe>
+          <div style="margin-top:12px; font-size:13px; opacity:0.6;">
+            Для полного поиска нажми на результат выше
+          </div>
         </div>
       `;
     }
@@ -149,12 +122,7 @@
     searchInput.addEventListener('input', (e) => {
       clearTimeout(searchTimeout);
       const query = e.target.value.trim();
-      if (!query) {
-        resultsDiv.innerHTML = '';
-        playerContainer.innerHTML = '';
-        return;
-      }
-      searchTimeout = setTimeout(() => searchYouTube(query), 700);
+      searchTimeout = setTimeout(() => searchSoundCloud(query), 600);
     });
   </script>
 </body>
